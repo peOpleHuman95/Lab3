@@ -94,7 +94,7 @@ public sealed class ImageProcessorTests
     public void Filter_RejectsInvalidBrightness() =>
         Assert.ThrowsException<ArgumentOutOfRangeException>(() => processor.ApplyFilter(Solid(Color.Red), PhotoFilter.Brightness, 101));
     [TestMethod]
-    public void Collage_PlacesPhotosInRequestedOrderAndLeavesWhiteEmptyCell()
+    public void Collage_PlacesPhotosInOrderAndFillsIncompleteRow()
     {
         byte[][] photos = [Solid(Color.Red), Solid(Color.Blue), Solid(Color.Lime)];
         using var result = ImageProcessor.Decode(processor.Collage(photos, 2, 40, 30));
@@ -102,15 +102,51 @@ public sealed class ImageProcessorTests
         Assert.AreEqual(Color.Red.ToArgb(), result.GetPixel(20, 15).ToArgb());
         Assert.AreEqual(Color.Blue.ToArgb(), result.GetPixel(60, 15).ToArgb());
         Assert.AreEqual(Color.Lime.ToArgb(), result.GetPixel(20, 45).ToArgb());
-        Assert.AreEqual(Color.White.ToArgb(), result.GetPixel(60, 45).ToArgb());
+        Assert.AreEqual(Color.Lime.ToArgb(), result.GetPixel(60, 45).ToArgb());
     }
     [TestMethod]
-    public void Collage_PreservesAspectRatioWithWhitePadding()
+    public void Collage_FillsCellWithoutPadding()
     {
         using var result = ImageProcessor.Decode(processor.Collage([Solid(Color.Red, 10, 20)], 1, 40, 40));
-        Assert.AreEqual(Color.White.ToArgb(), result.GetPixel(0, 20).ToArgb());
+        Assert.AreEqual(Color.Red.ToArgb(), result.GetPixel(0, 20).ToArgb());
         Assert.AreEqual(Color.Red.ToArgb(), result.GetPixel(20, 20).ToArgb());
     }
+    [TestMethod]
+    public void Collage_HasNoUnpaintedPixelsAtSeamsOrIncompleteRow()
+    {
+        byte[][] photos = [Solid(Color.Red, 3, 20), Solid(Color.Blue, 30, 2),
+            Solid(Color.Lime, 1, 1), Solid(Color.Yellow, 7, 15), Solid(Color.Magenta, 25, 3)];
+        using var result = ImageProcessor.Decode(processor.Collage(photos, 3, 7, 9));
+        Assert.AreEqual(21, result.Width); Assert.AreEqual(18, result.Height);
+        for (int y = 0; y < result.Height; y++)
+            for (int x = 0; x < result.Width; x++)
+            {
+                Color pixel = result.GetPixel(x, y);
+                Assert.AreEqual(255, (int)pixel.A, $"Прозрачный шов в ({x},{y})");
+                Assert.AreNotEqual(Color.White.ToArgb(), pixel.ToArgb(), $"Белый зазор в ({x},{y})");
+            }
+        Assert.AreEqual(Color.Yellow.ToArgb(), result.GetPixel(9, 13).ToArgb());
+        Assert.AreEqual(Color.Magenta.ToArgb(), result.GetPixel(10, 13).ToArgb());
+    }
+
+    [TestMethod]
+    public void Collage_CenterCropsInsteadOfStretchingPortrait()
+    {
+        using var portrait = new Bitmap(10, 30);
+        using (var g = Graphics.FromImage(portrait))
+        {
+            g.Clear(Color.Red);
+            using var brush = new SolidBrush(Color.Blue);
+            g.FillRectangle(brush, 0, 10, 10, 10);
+        }
+        byte[] source = ImageProcessor.Encode(portrait);
+        using var result = ImageProcessor.Decode(processor.Collage([source], 1, 10, 10));
+        Assert.AreEqual(Color.Blue.ToArgb(), result.GetPixel(5, 2).ToArgb());
+        Assert.AreEqual(Color.Blue.ToArgb(), result.GetPixel(5, 7).ToArgb());
+        using var original = ImageProcessor.Decode(source);
+        Assert.AreEqual(Color.Red.ToArgb(), original.GetPixel(5, 0).ToArgb());
+    }
+
     [TestMethod]
     public void Collage_RejectsEmptySelection() =>
         Assert.ThrowsException<ArgumentException>(() => processor.Collage([], 1, 40, 40));

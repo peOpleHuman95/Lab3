@@ -124,24 +124,38 @@ public sealed class ImageProcessor : IImageProcessor
     public byte[] Collage(IReadOnlyList<byte[]> sources, int columns, int cellWidth, int cellHeight)
     {
         ArgumentNullException.ThrowIfNull(sources);
-        if (sources.Count == 0 || columns < 1 || columns > sources.Count) throw new ArgumentException("Укажите фотографии и число столбцов от 1 до числа фото.");
+        if (sources.Count == 0 || columns < 1 || columns > sources.Count)
+            throw new ArgumentException("Укажите фотографии и число столбцов от 1 до числа фото.");
         CheckSize(cellWidth, cellHeight);
         int rows = (sources.Count - 1) / columns + 1;
         int width = checked(columns * cellWidth), height = checked(rows * cellHeight);
         CheckSize(width, height);
         using var result = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         using (var graphics = Graphics.FromImage(result))
+        using (var attributes = new ImageAttributes())
         {
-            graphics.Clear(Color.White);
+            graphics.CompositingMode = CompositingMode.SourceCopy;
             graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            // Продолжаем крайние пиксели при интерполяции, избегая прозрачных швов.
+            attributes.SetWrapMode(WrapMode.TileFlipXY);
             for (int i = 0; i < sources.Count; i++)
             {
                 using var image = Decode(sources[i]);
-                double scale = Math.Min((double)cellWidth / image.Width, (double)cellHeight / image.Height);
-                int w = Math.Max(1, (int)(image.Width * scale)), h = Math.Max(1, (int)(image.Height * scale));
-                int x = i % columns * cellWidth + (cellWidth - w) / 2;
-                int y = i / columns * cellHeight + (cellHeight - h) / 2;
-                graphics.DrawImage(image, new Rectangle(x, y, w, h));
+                int row = i / columns, column = i % columns;
+                int countInRow = Math.Min(columns, sources.Count - row * columns);
+                // В последнем ряду оставшиеся фотографии делят всю ширину.
+                int left = (int)((long)column * width / countInRow);
+                int right = (int)((long)(column + 1) * width / countInRow);
+                var destination = new Rectangle(left, row * cellHeight, right - left, cellHeight);
+                double scale = Math.Max((double)destination.Width / image.Width,
+                    (double)destination.Height / image.Height);
+                float sourceWidth = (float)(destination.Width / scale);
+                float sourceHeight = (float)(destination.Height / scale);
+                float sourceX = (image.Width - sourceWidth) / 2;
+                float sourceY = (image.Height - sourceHeight) / 2;
+                graphics.DrawImage(image, destination, sourceX, sourceY, sourceWidth, sourceHeight,
+                    GraphicsUnit.Pixel, attributes);
             }
         }
         return Encode(result);
