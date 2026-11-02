@@ -21,7 +21,7 @@ internal static class Program
         {
             Console.WriteLine("\nЛАБОРАТОРНАЯ РАБОТА № 3 — ВАРИАНТ 1. ФОТОРЕДАКТОР");
             Console.WriteLine(project.Photos.Count == 0 ? "Проект пуст." : $"Фотографий: {project.Photos.Count}. Выбрана: {project.Current.Name}");
-            Console.WriteLine("1. Добавить фото из файла\n2. Список и выбор фото\n3. Посмотреть миниатюру\n4. Обрезать фото\n5. Повернуть фото\n6. Добавить надпись\n7. Изменить пиксель\n8. Применить фильтр\n9. Создать коллаж\n10. Экспортировать фото\n11. Сохранить проект\n12. Загрузить проект\n13. Удалить выбранное фото\n14. Справка\n0. Сохранить и выйти");
+            Console.WriteLine("1. Добавить фото из файла\n2. Список и выбор фото\n3. Сведения о фото\n4. Обрезать фото\n5. Повернуть фото\n6. Добавить надпись\n7. Изменить пиксель\n8. Применить фильтр\n9. Создать коллаж\n10. Экспортировать фото\n11. Сохранить проект\n12. Загрузить проект\n13. Удалить выбранное фото\n14. Справка\n0. Сохранить и выйти");
             try
             {
                 switch (ReadInt("Ваш выбор: ", 0, 14))
@@ -29,7 +29,7 @@ internal static class Program
                     case 0: if (Save()) return; break;
                     case 1: Import(); break;
                     case 2: Select(); break;
-                    case 3: ConsolePhotoViewer.Show(project.Current); break;
+                    case 3: PhotoInfoPrinter.Show(project.Current); break;
                     case 4: Crop(); break;
                     case 5:
                         var photo = project.Current;
@@ -62,7 +62,7 @@ internal static class Program
         string path = ReadPath("Путь к фото (PNG, JPEG, BMP, GIF, TIFF): ");
         project.Add(Path.GetFileName(path), File.ReadAllBytes(path));
         Console.WriteLine("Фото добавлено. Оригинальный файл не изменяется.");
-        ConsolePhotoViewer.Show(project.Current);
+        PhotoInfoPrinter.Show(project.Current);
     }
     private static void Select()
     {
@@ -192,7 +192,7 @@ internal static class Program
         Console.WriteLine("Координаты начинаются с нуля в левом верхнем углу. Повороты кратны 90°.");
         Console.WriteLine("Исходные файлы не изменяются при обработке. Экспорт создаёт PNG/JPEG/BMP.");
         Console.WriteLine("Коллаж сохраняет пропорции фотографий, свободные участки заполняются белым.");
-        Console.WriteLine("Миниатюра использует палитру терминала; точный результат смотрите в экспортированном файле.");
+        Console.WriteLine("Для просмотра фото экспортируйте его пунктом 10 и откройте полученный файл.");
         Console.WriteLine("Сохранение проекта включает все фото, правки и выбранный номер. После перезапуска выберите 12.");
         Console.WriteLine("Пункт 0 сохраняет и завершает работу. Принудительное закрытие окна не сохраняет правки.");
     }
