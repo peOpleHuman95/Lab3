@@ -3,16 +3,19 @@ using System.Text.Json;
 
 namespace Lab3PhotoEditor.Tests;
 
+// Модульные тесты проверяют результат по размерам и пикселям, а не только факт отсутствия ошибок.
 [TestClass]
 public sealed class ImageProcessorTests
 {
     private readonly IImageProcessor processor = new ImageProcessor();
+    // Создаём небольшое одноцветное изображение с известными данными для проверок.
     internal static byte[] Solid(Color color, int width = 4, int height = 3)
     {
         using var image = new Bitmap(width, height);
         using (var g = Graphics.FromImage(image)) g.Clear(color);
         return ImageProcessor.Encode(image);
     }
+    // Считываем пиксель результата, освобождая декодированное изображение.
     private static Color Pixel(byte[] data, int x = 0, int y = 0)
     { using var image = ImageProcessor.Decode(data); return image.GetPixel(x, y); }
 
@@ -167,14 +170,18 @@ public sealed class ImageProcessorTests
     public void Size_RejectsExcessiveCanvas() => Assert.ThrowsException<ArgumentOutOfRangeException>(() => ImageProcessor.CheckSize(10000, 10000));
 }
 
+// Модульные тесты проверяют результат по размерам и пикселям, а не только факт отсутствия ошибок.
 [TestClass]
+// Тесты сохранения и экспорта используют собственные временные файлы, не пользовательский проект.
 public sealed class ProjectTests
 {
     private string directory = null!;
     private string SavePath => Path.Combine(directory, "project.json");
     private readonly IProjectStorage storage = new JsonProjectStorage();
+    // Перед каждым тестом выделяем отдельный каталог, чтобы параллельные проверки не мешали друг другу.
     [TestInitialize]
     public void Initialize() => directory = Path.Combine(Path.GetTempPath(), "PhotoEditorTests", Guid.NewGuid().ToString("N"));
+    // После проверки удаляем только её временный каталог.
     [TestCleanup]
     public void Cleanup() { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     [TestMethod]

@@ -6,20 +6,24 @@ using System.Text.Json;
 
 namespace Lab3PhotoEditor;
 
+// Консольный интерфейс: получает параметры и передаёт работу обработчику и хранилищу.
 internal static class Program
 {
+    // Интерфейсы отделяют пользовательское меню от конкретной реализации сервисов.
     private static readonly IImageProcessor Processor = new ImageProcessor();
     private static readonly IProjectStorage Storage = new JsonProjectStorage();
+    // Путь привязан к приложению и не зависит от каталога, из которого запущен терминал.
     private static readonly string SavePath = Path.Combine(AppContext.BaseDirectory, "saves", "photo-project.json");
     private static PhotoProject project = new();
 
+    // Основной цикл: показываем меню, выполняем команду и возвращаемся к выбору действия.
     private static void Main()
     {
         Console.InputEncoding = Encoding.UTF8;
         Console.OutputEncoding = Encoding.UTF8;
         while (true)
         {
-            Console.WriteLine("\nЛАБОРАТОРНАЯ РАБОТА № 3 — ВАРИАНТ 1. ФОТОРЕДАКТОР");
+            Console.WriteLine("\nЛАБОРАТОРНАЯ РАБОТА № 3 — ВАРИАНТ 1. ФОТОРЕДАКТОР\n");
             Console.WriteLine(project.Photos.Count == 0 ? "Проект пуст." : $"Фотографий: {project.Photos.Count}. Выбрана: {project.Current.Name}");
             Console.WriteLine("1. Добавить фото из файла\n2. Список и выбор фото\n3. Сведения о фото\n4. Обрезать фото\n5. Повернуть фото\n6. Добавить надпись\n7. Изменить пиксель\n8. Применить фильтр\n9. Создать коллаж\n10. Экспортировать фото\n11. Сохранить проект\n12. Загрузить проект\n13. Удалить выбранное фото\n14. Справка\n0. Сохранить и выйти");
             try
@@ -52,11 +56,13 @@ internal static class Program
                     case 14: Help(); break;
                 }
             }
+            // При завершении потока ввода пытаемся сохранить проект перед выходом.
             catch (EndOfStreamException) { Save(); return; }
             catch (Exception error) when (IsUserError(error)) { Console.WriteLine("Ошибка: " + error.Message); }
         }
     }
 
+    // Импорт читается в память; исходный файл не изменяется.
     private static void Import()
     {
         string path = ReadPath("Путь к фото (PNG, JPEG, BMP, GIF, TIFF): ");
@@ -64,6 +70,7 @@ internal static class Program
         Console.WriteLine("Фото добавлено. Оригинальный файл не изменяется.");
         PhotoInfoPrinter.Show(project.Current);
     }
+    // В меню пользователь вводит номер от 1, в модели используются индексы от 0.
     private static void Select()
     {
         ListPhotos();
@@ -71,6 +78,7 @@ internal static class Program
         int number = ReadInt("Номер фото (0 — назад): ", 0, project.Photos.Count);
         if (number > 0) project.Select(number - 1);
     }
+    // Выводим список документов и отмечаем выбранную фотографию.
     private static void ListPhotos()
     {
         for (int i = 0; i < project.Photos.Count; i++)
@@ -80,6 +88,7 @@ internal static class Program
         }
         if (project.Photos.Count == 0) Console.WriteLine("Список пуст.");
     }
+    // Пределы ввода зависят от размеров фото и выбранного начала прямоугольника.
     private static void Crop()
     {
         var photo = project.Current;
@@ -90,6 +99,7 @@ internal static class Program
         photo.ImageData = Processor.Crop(photo.ImageData, x, y, width, height);
         Console.WriteLine("Фото обрезано.");
     }
+    // Собираем параметры надписи; новое изображение присваивается только при успешной обработке.
     private static void Caption()
     {
         var photo = project.Current;
@@ -100,6 +110,7 @@ internal static class Program
         photo.ImageData = Processor.AddText(photo.ImageData, text, x, y, size, ReadColor());
         Console.WriteLine("Надпись добавлена; часть за границей фото обрезается.");
     }
+    // Показываем старый цвет, затем запрашиваем новый RGB для одного пикселя.
     private static void Pixel()
     {
         var photo = project.Current;
@@ -110,6 +121,7 @@ internal static class Program
         photo.ImageData = Processor.SetPixel(photo.ImageData, x, y, ReadColor());
         Console.WriteLine("Пиксель изменён.");
     }
+    // Меню переводит номер фильтра в перечисление и запрашивает необходимые параметры.
     private static void Filter()
     {
         var photo = project.Current;
@@ -130,6 +142,7 @@ internal static class Program
         photo.ImageData = Processor.ApplyFilter(photo.ImageData, filter, value, green, blue);
         Console.WriteLine("Фильтр применён.");
     }
+    // Порядок введённых номеров определяет расположение фото; повторные номера допустимы.
     private static void Collage()
     {
         _ = project.Current;
@@ -150,6 +163,7 @@ internal static class Program
         project.Add(ReadText("Название коллажа: "), result);
         Console.WriteLine("Коллаж добавлен отдельным фото. Исходные фотографии сохранены.");
     }
+    // Экспорт создаёт обычный графический файл; перезапись требует подтверждения пользователя.
     private static void Export()
     {
         var photo = project.Current;
@@ -158,15 +172,20 @@ internal static class Program
         ImageProcessor.Export(photo.ImageData, path);
         Console.WriteLine("Фото экспортировано: " + Path.GetFullPath(path));
     }
+    // Каждая составляющая RGB задаётся целым числом от 0 до 255.
     private static Color ReadColor() => Color.FromArgb(
         ReadInt("R (0..255): ", 0, 255), ReadInt("G (0..255): ", 0, 255), ReadInt("B (0..255): ", 0, 255));
+    // Возвращаем признак успеха, чтобы пункт выхода не завершал программу после ошибки записи.
     private static bool Save()
     {
         try { Storage.Save(SavePath, project); Console.WriteLine("Проект сохранён: " + SavePath); return true; }
         catch (Exception error) when (IsUserError(error)) { Console.WriteLine("Ошибка сохранения: " + error.Message); return false; }
     }
+    // Подтверждением считается только ответ «да» без учёта регистра.
     private static bool Confirm(string prompt) => ReadText(prompt + " (да/нет): ").Equals("да", StringComparison.OrdinalIgnoreCase);
+    // Разрешаем вставлять путь, окружённый кавычками.
     private static string ReadPath(string prompt) => ReadText(prompt).Trim('"');
+    // Не принимаем пустую строку; null означает завершение потока ввода.
     private static string ReadText(string prompt)
     {
         while (true)
@@ -177,6 +196,7 @@ internal static class Program
             Console.WriteLine("Введите непустую строку.");
         }
     }
+    // Повторяем запрос, пока не получим целое число в указанном диапазоне.
     private static int ReadInt(string prompt, int min, int max)
     {
         while (true)
@@ -185,8 +205,10 @@ internal static class Program
             Console.WriteLine($"Введите целое число от {min} до {max}.");
         }
     }
+    // Ожидаемые ошибки данных, файлов и графической библиотеки показываем без аварийного завершения.
     private static bool IsUserError(Exception error) => error is ArgumentException or IOException or
         UnauthorizedAccessException or JsonException or ExternalException or OverflowException or InvalidOperationException;
+    // Краткая инструкция по координатам, экспорту и восстановлению сохранённой сессии.
     private static void Help()
     {
         Console.WriteLine("Добавьте фотографии, выберите одну и применяйте операции через меню.");
